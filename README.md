@@ -24,18 +24,22 @@
 ### 安装步骤
 
 1. **克隆项目**
-bash
-git clone https://github.com/your-org/llm-hallucination-correction.git
+```
+git clone [https://github.com/Peter-code258/llm_hallucination_correction]
 cd llm-hallucination-correction
+```
 2. **安装依赖**
-bash
+```
 pip install -r requirements.txt
+```
 3. **配置环境变量**
-bash
+```
 cp .env.example .env
+```
 编辑 .env 文件，配置API密钥等参数
+
 4. **初始化知识库**
-python
+```
 from src.orchestrator import EvidenceEnhancedCorrectionOrchestrator
 from config_loader import load_config
 config = load_config()
@@ -44,17 +48,16 @@ orchestrator = EvidenceEnhancedCorrectionOrchestrator(config)
 documents = [
 "大语言模型幻觉是指生成不真实内容的现象。",
 "检索增强生成(RAG)可以减轻幻觉问题。",
-# 更多文档...
-]
-orchestrator.add_knowledge_documents(documents)
+```
 5. **运行测试**
-bash
+```
 pytest tests/ -v
+```
 ### 基本使用
-python
+```
 from src.orchestrator import EvidenceEnhancedCorrectionOrchestrator
 from config_loader import load_config
-初始化系统
+#初始化系统
 config = load_config()
 orchestrator = EvidenceEnhancedCorrectionOrchestrator(config)
 执行纠正
@@ -64,15 +67,16 @@ result = orchestrator.process_correction(query, original_answer)
 if result['success']:
 print(f"纠正后的答案: {result['corrected_answer']}")
 print(f"支持率: {result['analysis_results']['correction_summary']['support_ratio']:.2%}")
+```
 ### API服务
-
 启动RESTful API服务：
-bash
+```
 python src/api_server.py
+```
 API文档访问: http://localhost:8000/docs
 
 ## 配置说明
-
+嘻嘻
 ### 主要配置项
 
 - `llm.provider`: LLM服务提供商 (openai/deepseek)
@@ -87,7 +91,7 @@ API文档访问: http://localhost:8000/docs
 - 设置`CACHE_TTL`启用结果缓存
 
 ## 项目结构
-
+```
 llm_hallucination_correction/
 ├── src/                          # 源代码目录
 │   ├── __init__.py
@@ -116,6 +120,7 @@ llm_hallucination_correction/
 ├── monitoring/                  # 监控配置
 │   └── prometheus.yml           #监控和指标配置
 └── README.md                    # 项目说明
+```
 ## 开发指南
 
 ### 添加新的意图类型
