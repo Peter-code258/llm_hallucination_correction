@@ -1,0 +1,41 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  - job_name: 'llm-corrector'
+    static_configs:
+      - targets: ['llm-hallucination-corrector:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# 记录规则
+groups:
+  - name: llm_corrector_rules
+    interval: 30s
+    rules:
+      - record: job:llm_corrector_requests_total:rate5m
+        expr: rate(llm_corrector_requests_total[5m])
+      
+      - record: job:llm_corrector_processing_duration_seconds:avg5m
+        expr: avg_over_time(llm_corrector_processing_duration_seconds[5m])
+      
+      - record: job:llm_corrector_success_rate:ratio5m
+        expr: 
+          rate(llm_corrector_requests_success_total[5m]) 
+          / 
+          rate(llm_corrector_requests_total[5m])
