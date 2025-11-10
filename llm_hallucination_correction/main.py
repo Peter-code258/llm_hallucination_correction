@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 大语言模型幻觉检测与纠正系统 - 主入口文件
 """
@@ -9,6 +8,23 @@ import argparse
 import json
 from datetime import datetime
 from src.orchestrator import EvidenceEnhancedCorrectionOrchestrator
+"""
+from prompt_templates import PromptTemplates
+
+# 快速使用
+templates = PromptTemplates()
+
+# 获取意图分类提示词
+prompt = templates.get_intent_classification_prompt("你的查询内容")
+
+# 获取答案纠正提示词
+correction_prompt = templates.get_correction_prompt(
+    intent="事实查询",
+    query="原始问题",
+    original_answer="需要验证的答案",
+    verification_summary="验证结果摘要"
+)
+"""
 
 def load_config(config_path: str = "config/config.yaml") -> dict:
     """加载配置文件"""
@@ -197,4 +213,5 @@ def main():
         interactive_mode(orchestrator)
 
 if __name__ == "__main__":
+
     main()
