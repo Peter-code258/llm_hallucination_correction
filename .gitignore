@@ -1,0 +1,16 @@
+# Python 字节码与缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 环境与配置
+.env
+.venv/
+venv/
+
+# 本地数据（知识库/向量库/优化产物不在版本库中）
+data/knowledge_base/
+data/vector_db/
+data/optimized_prompts/
+data/dspy_logs/

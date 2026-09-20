@@ -28,6 +28,26 @@ intent:
   supported_intents: ["事实查询", "比较查询", "方法查询", "观点查询"]
   default_intent: "事实查询"
 
+# 自动 prompt 优化配置（DSPy）
+prompt_optimization:
+  # 优化后 prompt 存放目录，PromptTemplates() 会从这里加载
+  optimized_dir: "./data/optimized_prompts"
+  # 默认优化方法：mipro（同时优化 instruction + demos）/ bootstrap（仅 demos）
+  default_method: "mipro"
+  # 训练/验证集根目录（每个 signature 一个 json 文件）
+  train_data_dir: "./data/optimize_train"
+  val_data_dir: "./data/optimize_val"
+  # MIPROv2 超参
+  mipro:
+    num_threads: 4
+    max_labeled_demos: 4
+    max_bootstrapped_demos: 4
+    log_dir: "./data/dspy_logs"
+  bootstrap:
+    max_labeled_demos: 4
+    max_bootstrapped_demos: 4
+    max_errors: 3
+
 # 系统配置
 system:
   log_level: "INFO"
