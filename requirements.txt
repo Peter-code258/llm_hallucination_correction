@@ -26,6 +26,17 @@ python-dotenv>=0.19.0
 # 测试框架
 pytest>=6.2.0
 
+# 自动 prompt 优化（DSPy）
+# 用于 src/llm/dspy_signatures.py / dspy_adapter.py / prompt_optimizer.py / scripts/optimize_prompts.py
+# 注：3.x 起 BootstrapFewShotWithMetric 已移除，本仓库改用 BootstrapFewShotWithRandomSearch
+dspy>=3.0.0
+litellm>=1.30.0  # DSPy 的 LM 后端依赖
+
+# 评估指标
+# 用于 PromptOptimizer._rouge_l（initial_answer / answer_correction 的默认 metric）
+# 注：包不可用时 PromptOptimizer 会自动回退到 token-overlap，非硬依赖
+rouge-score>=0.1.2
+
 # Web框架（可选）
 fastapi>=0.68.0
 uvicorn>=0.15.0
