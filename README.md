@@ -10,6 +10,7 @@
 - ✏️ **智能纠正**: 意图特定的答案重写策略
 - 📊 **可解释性**: 完整的验证轨迹和纠正依据
 - 🚀 **高性能**: 模块化设计，支持批量处理
+- 🧠 **自动 Prompt 优化**: 基于 [DSPy](https://github.com/stanfordnlp/dspy) 的 MIPROv2 / Bootstrap 自动优化全部 prompt 模板，无需手工调优
 
 ## 项目结构
 ```
@@ -21,7 +22,10 @@ llm-hallucination-correction/
 │   ├── llm/                      # LLM相关模块
 │   │   ├── __init__.py
 │   │   ├── llm_client.py         # LLM客户端适配器（多提供商支持）
-│   │   └── prompt_templates.py   # Prompt模板管理系统
+│   │   ├── prompt_templates.py   # Prompt模板管理系统（支持加载优化后版本）
+│   │   ├── dspy_signatures.py    # DSPy Signature 定义（6个基础 + 4个纠正变体）
+│   │   ├── dspy_adapter.py       # 将 LLMAdapter 包装为 dspy.LM
+│   │   └── prompt_optimizer.py   # DSPy 自动 Prompt 优化器（MIPROv2 / Bootstrap）
 │   ├── retrieval/                # 检索模块
 │   │   ├── __init__.py
 │   │   └── vector_retriever.py   # 向量检索器（基于ChromaDB）
@@ -43,13 +47,15 @@ llm-hallucination-correction/
 │   ├── __init__.py
 │   ├── test_llm_client.py        # LLM客户端测试
 │   ├── test_retrieval.py         # 检索模块测试
-│   └── test_full_pipeline.py     # 完整流程测试
+│   ├── test_full_pipeline.py     # 完整流程测试
+│   └── test_prompt_optimizer.py  # Prompt 优化模块测试
 ├── docs/                         # 文档目录
 │   ├── api.md                    # API接口文档
 │   └── deployment.md             # 部署指南
 ├── scripts/                      # 脚本目录
 │   ├── setup_knowledge_base.py   # 知识库初始化脚本
-│   └── batch_processing.py       # 批量处理脚本
+│   ├── batch_processing.py       # 批量处理脚本
+│   └── optimize_prompts.py       # DSPy 自动 Prompt 优化入口脚本
 ├── main.py                       # 主入口文件
 ├── requirements.txt              # Python依赖列表
 ├── .env.example                  # 环境变量示例文件
@@ -70,8 +76,8 @@ llm-hallucination-correction/
 
 克隆项目仓库 
 ```
-git clone https://github.com/your-org/llm-hallucination-correction.git
-cd llm-hallucination-correction
+git clone https://github.com/Peter-code258/llm_hallucination_correction.git
+cd llm_hallucination_correction
 ```
 创建虚拟环境（推荐）
 ```
@@ -134,6 +140,24 @@ retrieval:
 verification:
   confidence_threshold: 0.8
   max_verification_attempts: 3
+```
+
+自动 Prompt 优化配置（DSPy）
+```
+prompt_optimization:
+  optimized_dir: "./data/optimized_prompts"      # 优化后 prompt 存放目录
+  default_method: "mipro"                         # mipro 或 bootstrap
+  train_data_dir: "./data/optimize_train"
+  val_data_dir: "./data/optimize_val"
+  mipro:
+    num_threads: 4
+    max_labeled_demos: 4
+    max_bootstrapped_demos: 4
+    log_dir: "./data/dspy_logs"
+  bootstrap:
+    max_labeled_demos: 4
+    max_bootstrapped_demos: 4
+    max_errors: 3
 ```
 
 环境变量配置
@@ -222,6 +246,122 @@ orchestrator = EvidenceEnhancedCorrectionOrchestrator(config)
 result = orchestrator.process_query("你的查询")
 ```
 
+ - 自动 Prompt 优化器 (src/llm/prompt_optimizer.py)
+
+基于 [DSPy](https://github.com/stanfordnlp/dspy) 对全部 prompt 模板进行程序化优化，无需手工调优。
+
+支持两种优化器：
+- **MIPROv2**（`--method mipro`）：同时优化 instruction 文本和 few-shot demos（推荐）
+- **Bootstrap**（`--method bootstrap`）：仅优化 few-shot demos，instruction 保持不变
+
+优化后的 prompt 以 JSON 形式保存到 `data/optimized_prompts/<name>.json`，运行时由 `PromptTemplates` 自动加载。
+
+支持的模板（10 个 Signature）：
+`initial_answer`、`intent_classification`、`claim_extraction`、`fact_verification`、`hallucination_detection`、`answer_correction`，以及答案纠正的 4 个意图变体：`answer_correction_factual` / `_comparison` / `_method` / `_opinion`。
+
+使用示例：
+```python
+from src.llm.dspy_adapter import configure_dspy_from_config
+from src.llm.prompt_optimizer import PromptOptimizer
+
+configure_dspy_from_config(config)
+optimizer = PromptOptimizer(output_dir="./data/optimized_prompts")
+optimizer.optimize(
+    name="fact_verification",
+    trainset=train_examples,
+    valset=val_examples,
+    optimizer_type="mipro",
+)
+```
+
+# 🧠 自动 Prompt 优化（使用指南）
+
+本项目支持基于 DSPy 的自动 prompt 优化，可对全部 10 个 prompt 模板进行程序化调优。
+
+## 为什么需要自动优化？
+
+项目原始 prompt 均为手工编写的固定模板。通过 DSPy，可以在标注数据集上自动搜索更优的 instruction 文本和 few-shot 示例，提升验证准确率、纠正质量等关键指标，且无需修改业务代码。
+
+## 快速开始
+
+```bash
+# 1. 安装依赖（含 dspy）
+pip install -r requirements.txt
+
+# 2. 配置 LLM API Key
+export DEEPSEEK_API_KEY=sk-...
+
+# 3. 优化单个模板（事实验证，对 pipeline 质量影响最大）
+python scripts/optimize_prompts.py --name fact_verification --method mipro
+
+# 4. 或一次性优化全部 10 个模板
+python scripts/optimize_prompts.py --all --method mipro
+```
+
+优化完成后，`data/optimized_prompts/<name>.json` 会自动生成。下一次运行 `main.py` 时，`PromptTemplates()` 会优先加载优化后的 prompt——**无需改动任何业务代码**。
+
+## 使用自定义数据集
+
+默认脚本内置了少量 demo 数据，正式场景请准备自己的标注数据（JSON 列表）：
+
+```bash
+python scripts/optimize_prompts.py \
+  --name fact_verification \
+  --train data/optimize_train/fact_verification.json \
+  --val   data/optimize_val/fact_verification.json
+```
+
+训练数据格式示例（`fact_verification`）：
+```json
+[
+  {
+    "intent": "事实查询",
+    "query": "Python 由谁创造？",
+    "claim": "Python 由 Guido van Rossum 于 1991 年发布。",
+    "evidence_text": "[证据1] Python 由 Guido van Rossum 在 1991 年首次发布。",
+    "verdict": "SUPPORTED",
+    "confidence": 0.95,
+    "reasoning": "证据明确支持该声明。",
+    "intent_specific_analysis": "事实型查询，证据直接命中。"
+  }
+]
+```
+
+## 运行时加载策略
+
+`PromptTemplates` 采用三级回退：
+
+```
+answer_correction_<intent>.json   # 按意图优化的变体（最高优先级）
+        ↓ 不存在
+answer_correction.json            # 通用优化版本
+        ↓ 不存在
+原手工模板（CORRECTION_TEMPLATES）  # 最终回退
+```
+
+因此，即使优化文件缺失或损坏，系统仍能正常工作。
+
+## 评估指标
+
+`PromptOptimizer` 为每个 Signature 提供了默认 metric：
+
+| Signature | 默认 metric |
+|---|---|
+| `intent_classification` | 意图准确率 |
+| `fact_verification` | verdict 命中(0.7) + confidence 加权(0.3) |
+| `claim_extraction` | 声明集合 Jaccard 相似度 |
+| `hallucination_detection` | 幻觉存在性准确率 |
+| `initial_answer` / `answer_correction*` | ROUGE-L F1（`rouge_score` 不可用时回退到 token-overlap） |
+
+也可通过 `optimizer.optimize(metric=your_fn)` 传入自定义 metric。
+
+## 注意事项
+
+- MIPROv2 需要验证集（`valset`），Bootstrap 不需要
+- 优化过程会调用 LLM API，请注意 token 消耗
+- 建议至少准备 20~50 条标注数据，效果才显著
+- DSPy 3.x 起 `BootstrapFewShotWithMetric` 已移除，本项目使用 `BootstrapFewShotWithRandomSearch`
+
 # 📊 API接口
 单次查询处理
 ```
@@ -262,6 +402,9 @@ python -m pytest tests/
 
 # 运行特定测试模块
 python -m pytest tests/test_llm_client.py -v
+
+# 运行 Prompt 优化模块测试
+python -m pytest tests/test_prompt_optimizer.py -v
 
 # 带覆盖率报告
 python -m pytest --cov=src tests/
@@ -395,7 +538,21 @@ FastAPI：高性能API框架
 
 Pytest：测试框架
 
+[DSPy](https://github.com/stanfordnlp/dspy)：程序化 prompt 优化框架
+
+[rouge-score](https://github.com/google-research/google-research/tree/master/rouge)：ROUGE 评估指标
+
 # 🔄 版本历史
+
+v1.1.0 (2026-09-20)
+
+- 新增基于 DSPy 的自动 Prompt 优化功能（MIPROv2 / Bootstrap）
+- 支持 10 个 Signature（6 基础 + 4 答案纠正意图变体）的程序化优化
+- 优化后 prompt 自动加载，三级回退策略，无需修改业务代码
+- 新增 ROUGE-L 评估指标
+- 新增 scripts/optimize_prompts.py 优化入口脚本
+- 新增 tests/test_prompt_optimizer.py 测试（15 passed, 1 skipped）
+- requirements.txt 新增 dspy、litellm、rouge-score 依赖
 
 v1.0.0​ (2024-03-20)
 
